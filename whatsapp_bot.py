@@ -2,11 +2,9 @@
 WhatsApp integration using Twilio API
 """
 from twilio.rest import Client
-from datetime import datetime
 import config
 import logging
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -26,7 +24,7 @@ class WhatsAppBot:
         
         # Header
         lines.append("🚀 *PRE-MARKET STOCK PULSE*")
-        lines.append(f"📅 {datetime.now().strftime('%d %b %Y, %I:%M %p IST')}")
+        lines.append(f"📅 {config.now_ist().strftime('%d %b %Y, %I:%M %p IST')}")
         lines.append("=" * 35)
         lines.append("")
         
@@ -120,7 +118,7 @@ class WhatsAppBot:
         try:
             error_body = (
                 f"⚠️ *STOCK PULSE - ERROR*\n"
-                f"{datetime.now().strftime('%d %b %Y, %I:%M %p IST')}\n\n"
+                f"{config.now_ist().strftime('%d %b %Y, %I:%M %p IST')}\n\n"
                 f"Failed to generate today's report.\n"
                 f"Error: {error_message[:200]}\n\n"
                 f"Please check logs for details."
@@ -144,7 +142,7 @@ class WhatsAppBot:
         test_body = (
             f"✅ *TEST MESSAGE*\n"
             f"Stock Pulse bot is configured correctly!\n"
-            f"Time: {datetime.now().strftime('%d %b %Y, %I:%M %p IST')}\n\n"
+            f"Time: {config.now_ist().strftime('%d %b %Y, %I:%M %p IST')}\n\n"
             f"You will receive daily market reports at 9:00 AM IST."
         )
         

@@ -4,13 +4,12 @@ Core analysis engine for technical screening and sentiment analysis
 import yfinance as yf
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import timedelta
 from newsapi import NewsApiClient
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import config
 import logging
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -143,7 +142,7 @@ class NewsAnalyzer:
     def fetch_market_news(self):
         """Fetch general market and macro news"""
         try:
-            from_date = (datetime.now() - timedelta(days=config.NEWS_LOOKBACK_DAYS)).strftime('%Y-%m-%d')
+            from_date = (config.now_ist() - timedelta(days=config.NEWS_LOOKBACK_DAYS)).strftime('%Y-%m-%d')
             
             # Fetch India-specific business news
             india_news = self.newsapi.get_everything(
@@ -179,7 +178,7 @@ class NewsAnalyzer:
     def fetch_stock_specific_news(self, stock_names):
         """Fetch news for specific stocks"""
         try:
-            from_date = (datetime.now() - timedelta(days=config.NEWS_LOOKBACK_DAYS)).strftime('%Y-%m-%d')
+            from_date = (config.now_ist() - timedelta(days=config.NEWS_LOOKBACK_DAYS)).strftime('%Y-%m-%d')
             
             # Create query for top stocks
             query = ' OR '.join(stock_names[:5])  # Limit to top 5 to avoid query length issues
