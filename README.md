@@ -35,7 +35,7 @@ The workflow is scheduled for **09:00 IST** with the cron `30 3 * * *` (03:30 UT
 5. **Score 0–100:** above the EMA +30, RSI in that band +25, volume above 1.5× +25, daily change strictly above 2% +20. The label is `BREAKOUT` when the score is at least 70, otherwise `MOMENTUM`. Return at most 10 names, highest score first.
 6. **Fetch news** from NewsAPI for the last 1 day (the date is computed in Asia/Kolkata): an India market query and a global macro query, 20 articles each. If any names passed the screen, a third query covers the top 5 symbols, up to 30 articles.
 7. Score each title plus description with **VADER** (a rule-based lexicon, compound score from -1 to +1). Keep a high-impact item when the text contains a keyword from `HIGH_IMPACT_KEYWORDS` and the absolute score is above 0.3 (first 5 matches, in article order, not a re-rank). Keep a macro item when it contains a `MACRO_KEYWORDS` hit and the absolute score is above 0.2 (first 3). A stock mention is a case-insensitive substring of the symbol, not a whole word.
-8. **Send one WhatsApp message** through Twilio. If the pipeline throws, the script tries a short error message and then exits non-zero. If Twilio does not accept the report, the process exits non-zero as well.
+8. **Send the brief through Twilio.** The body is one compact message: one line per name, then shortened headlines. Twilio rejects a WhatsApp body over 1600 characters (error 21617). A full day, 10 names plus the news caps, is built to fit in one message. If a body is still longer, it is split on line breaks and each part is sent separately, numbered. If the pipeline throws, or Twilio does not accept a part, the script tries a short error message and exits non-zero.
 
 `python main.py --test` checks that the four required environment variables are set, screens the first 5 symbols, calls NewsAPI, and sends a real WhatsApp test message. It exits non-zero if any step fails.
 
@@ -62,65 +62,54 @@ These are visible in the code and in the Actions history. They are descriptions 
 | --- | --- | --- |
 | WhatsApp via Twilio | One message to one number. The sender defaults to Twilio's public sandbox number. | The sandbox is for development. There is no way to add a user from this repo. |
 | 50 hardcoded large-caps | A fixed list, so the job stays small and avoids thin names. | Mid-caps and a personal watchlist are out. The unused Nifty 500 path suggests a wider universe was considered and not built. |
-| Daily Yahoo Finance bars on a 09:00 IST cron | No paid market-data vendor and no server. | This is not a pre-open quote. The latest daily bar is the last completed session Yahoo returns. The message title still says `PRE-MARKET`. |
+| Daily Yahoo Finance bars on a 09:00 IST cron | No paid market-data vendor and no server. | This is not a pre-open quote. The latest daily bar is the last completed session Yahoo returns. The header says Stock Pulse, not pre-market. |
 | Run every day | One cron expression, including weekends and NSE holidays. | The phone gets a brief when the market is closed. |
 | Pass rule is EMA and (RSI or volume) | More names can qualify than if all three filters were required. | An older README described the stricter rule. The code does not implement it. |
 | A 0–100 score and two labels | Easy to scan in a chat message. `BREAKOUT` means the score is at least 70. | It is not an EMA crossover detector, and the points are not calibrated to later returns. |
-| VADER plus keyword lists | No model API, and the tags are easy to explain. | VADER is a general lexicon, not a finance model. The footer still says `Powered by Stock Pulse AI`. Short symbols such as `LT` match inside other words (`LT` is inside `RESULTS`). |
+| VADER plus keyword lists | No model API, and the tags are easy to explain. | VADER is a general lexicon, not a finance model. Headlines in the message are shortened, and the keyword line is not repeated. Short symbols such as `LT` match inside other words (`LT` is inside `RESULTS`). |
 | GitHub Actions instead of a server | No host to pay for. The schedule ran every day from 2 January through 5 November 2026. | The job depends on the runner image. It broke on 6 November 2026 when `ubuntu-latest` no longer had Python 3.9. GitHub also starts the cron late. |
+| One message under 1600 characters | Ten names on one line each, then clipped headlines. 🔥 is a score of at least 70. | The old multi-line layout was rejected by Twilio once the screen returned 10 names. A body that still does not fit is split, so the reader may get two messages. |
 
 ## Example message
 
-There is no screenshot in the repo. The block below is **an example of the layout**, produced by calling `WhatsAppBot.format_stock_report` with made-up prices, scores, and headlines. It was not captured from a phone, and it is not a record of a live run. The figures do follow the scoring rules: 100 is all four point awards, and 55 is EMA plus the RSI band only. Headlines are sliced to 100 characters (80 for a stock mention) and the code always appends `...`.
+There is no screenshot in the repo. The block below is **an example of the layout**, produced by `format_stock_report` with made-up prices, scores, and headlines. It was not captured from a phone. A score of 100 is all four point awards. 75 is every award except the volume flag. 80 is every award except the daily-change flag. 55 is the EMA plus the RSI band. 🔥 is a score of at least 70.
 
-On 1 September, 1 October, and 5 November 2026 the real message took the empty-screen path (`No strong breakouts detected today.`) because `yfinance` 0.2.33 returned no prices. With `yfinance` 1.8.0 and a six-month window, the same screen returned 10 names on 25 November 2026. The block below is still a layout example, not that run.
+On 1 September, 1 October, and 5 November 2026 the real message was the empty screen, because `yfinance` 0.2.33 returned no prices. A manual run on 25 November 2026 did return 10 names, and Twilio rejected that longer layout. This example is the compact layout, not that run.
 
 ```text
-🚀 *PRE-MARKET STOCK PULSE*
-📅 25 Nov 2026, 09:00 AM IST
-===================================
+*Stock Pulse* · 25 Nov 2026, 09:00 AM IST
 
-📈 *TOP TECHNICAL BREAKOUTS*
+*Screen* (10)
+🔥 CIPLA  ₹1000.00  +2.4%  RSI 64  1.8x  100
+🔥 BRITANNIA  ₹2000.00  +3.1%  RSI 61  1.9x  100
+🔥 DRREDDY  ₹1400.00  +1.3%  RSI 62  1.6x  80
+🔥 TCS  ₹2500.00  +2.3%  RSI 52  1.4x  75
+⚡ HINDUNILVR  ₹2100.00  +0.6%  RSI 58  1.1x  55
+⚡ ITC  ₹300.00  +0.4%  RSI 55  1.0x  55
+⚡ BAJAJFINSV  ₹1900.00  -0.8%  RSI 60  1.2x  55
+⚡ HDFCLIFE  ₹600.00  +0.5%  RSI 59  1.1x  55
+⚡ HEROMOTOCO  ₹4500.00  +1.1%  RSI 63  1.3x  55
+🔥 GRASIM  ₹1800.00  +2.8%  RSI 56  0.8x  75
 
-🔥 *RELIANCE*
-   Price: ₹1000.0 (🟢 +2.40%)
-   RSI: 64.2 | Vol: 1.8x
-   Signal: BREAKOUT (Score: 100/100)
+*Macro*
+🟢 Example headline about the RBI holding its policy rate
 
-⚡ *TCS*
-   Price: ₹500.0 (🟢 +0.80%)
-   RSI: 58.1 | Vol: 1.2x
-   Signal: MOMENTUM (Score: 55/100)
+*High impact*
+🟢 Example headline about a contract win
 
-🌍 *MACRO EVENTS*
+*In the news*
+CIPLA 🟢 Example headline that mentions Cipla
 
-🟢 Example headline about the RBI holding its policy rate...
-   Keywords: rbi, policy
-
-💥 *HIGH-IMPACT NEWS*
-
-🟢 Example headline about a contract win...
-   Tags: contract
-
-📰 *STOCK IN NEWS*
-
-• *RELIANCE*: 1 mention(s)
-  🟢 Example headline that mentions Reliance...
-
-===================================
-⚠️ *DISCLAIMER*: This is automated analysis.
-Not financial advice. DYOR before trading.
-
-🤖 Powered by Stock Pulse AI
+Not financial advice. DYOR.
 ```
 
-Prices use Python's default formatting, so one thousand prints as `₹1000.0`.
+Each line is `emoji, symbol, price, day change, RSI, volume multiple, score`. Headlines are clipped at 68 characters.
 
 ## Operating history
 
 Checked against the GitHub Actions API on 25 November 2026. The full list is on the [Actions tab](https://github.com/sachinG549/stock-pulse/actions).
 
-- The API lists **328 scheduled runs**, numbered **#18 through #345**, one per calendar day from **2 January 2026 through 25 November 2026**, with no missing day and no duplicate day in that span. Runs **#1–#17** are not in the listing. No `workflow_dispatch` run has been recorded. The workflow file was added on 17 December 2025.
+- The API lists **328 scheduled runs**, numbered **#18 through #345**, one per calendar day from **2 January 2026 through 25 November 2026**, with no missing day and no duplicate day in that span. Runs **#1–#17** are not in the listing. The workflow file was added on 17 December 2025. A manual run on 25 November 2026, after the Python fix was on `main`, screened 10 names and fetched news. Twilio then returned HTTP 400, error 21617, because the old layout was over 1600 characters. The short error note was accepted (HTTP 201). That run is [45652705613](https://github.com/sachinG549/stock-pulse/actions/runs/45652705613).
 - **308 runs succeeded**, from 2 January through **5 November 2026**. **20 runs failed**, from **6 November through 25 November 2026**. The scheduled job did run every day through most of 2026. "Succeeded" means the process exited 0.
 - The cron is 03:30 UTC, but the runs started later. Across all 328 runs the **median start was 166 minutes after 03:30 UTC**. The median delay was 60 minutes in January 2026, 381 minutes in October, and 481 minutes in November. A January run often began around 10:00 IST. By November, runs were often starting in the evening IST. The schedule says 09:00. The history does not.
 - Where a successful run's last-update time is still within 30 minutes of its start (234 runs), the gap from start to update was **62 to 126 seconds, median 80 seconds**, including dependency install. On 5 November the script step itself lasted about 30 seconds.
@@ -194,8 +183,8 @@ Editing `DEFAULT_TICKERS` is how the universe changes. There is no CSV loader.
 ## Limitations
 
 - `yfinance` 0.2.33 no longer parses Yahoo's response, which is why the September–November 2026 logs screened zero names. The pin is now 1.8.0, and the download is six months so the 70-row check can pass. On 25 November 2026 a 3-month window was still only 62 rows, and six months was 126.
-- `TATAMOTORS.NS` had no Yahoo quote on that day (`Quote not found`), so that one symbol is skipped. The other 49 were fetched. The list in `config.py` is unchanged.
-- The message can say `PRE-MARKET` and `Stock Pulse AI` while the inputs are the previous daily bar and a lexicon.
+- `TATAMOTORS.NS` has no Yahoo quote. NSE renamed that listing to `TMPV` (Tata Motors Passenger Vehicles) on 24 October 2025, and the demerged commercial-vehicle company listed later as `TMCV`. The fixed list now uses `TMPV.NS` in that slot. `TMCV.NS` is a separate company and is not added, so the list stays at 50.
+- The brief is the previous daily bar plus a lexicon. It does not say pre-market, and it does not say AI.
 - News matching is a substring. `LT`, `ITC`, and `TCS` will hit unrelated headlines.
 - High-impact and macro lists are the first matches in fetch order, capped at 5 and 3. They are not sorted by score.
 - The job runs on weekends and NSE holidays.
@@ -207,10 +196,10 @@ Editing `DEFAULT_TICKERS` is how the universe changes. There is no CSV loader.
 
 Not a commitment. Reasonable follow-ons from the limits above:
 
-- Revoke the NewsAPI key that remains in git history, and confirm a manual Actions run actually reaches the phone.
-- Replace `TATAMOTORS.NS` if you still want that business in the universe. Yahoo has no quote for that symbol.
+- Revoke the NewsAPI key that remains in git history, and confirm the next manual Actions run reaches the phone with the compact brief.
+- Add `TMCV.NS` only if the commercial-vehicle company belongs in this fixed list.
 - Skip weekends and NSE holidays.
-- Match tickers on word boundaries, and change the message footer and title so they match the data.
+- Match tickers on word boundaries.
 - Add a redacted screenshot of a real message.
 - Only after a second person is actually receiving it: a channel other people can join, and a count of whether the brief was useful. Those numbers are not in the repo today.
 
