@@ -33,8 +33,12 @@ class TechnicalAnalyzer:
         rsi = 100 - (100 / (1 + rs))
         return rsi
     
-    def fetch_stock_data(self, ticker, period='3mo'):
-        """Fetch historical data for a single ticker"""
+    def fetch_stock_data(self, ticker, period='6mo'):
+        """Fetch daily bars for one ticker.
+
+        Six months clears the 70-row minimum (50-day EMA plus a buffer).
+        Three months is often only about 60 NSE sessions.
+        """
         try:
             stock = yf.Ticker(ticker)
             hist = stock.history(period=period)

@@ -25,7 +25,7 @@ The workflow is scheduled for **09:00 IST** with the cron `30 3 * * *` (03:30 UT
 `python main.py` and `python main.py --run` do the same job:
 
 1. **Screen 50 NSE symbols** hardcoded in `config.py` (`DEFAULT_TICKERS`). They are not loaded from Nifty 50 or Nifty 500 membership. `NIFTY_500_TICKERS_FILE` names `nifty500_tickers.csv`, but nothing reads that path and the file is not in the repo.
-2. For each symbol, download about three months of **daily** OHLCV from Yahoo Finance with `yfinance` (`period='3mo'`), one symbol at a time. A symbol is dropped when the download is empty or has fewer than 70 rows (`EMA_PERIOD + 20`), or when the latest close is under ₹50.
+2. For each symbol, download six months of **daily** OHLCV from Yahoo Finance with `yfinance` (`period='6mo'`), one symbol at a time. A symbol is dropped when the download is empty or has fewer than 70 rows (`EMA_PERIOD + 20`), or when the latest close is under ₹50. Six months is enough for that minimum. Three months is often only about 60 sessions.
 3. On the rows that remain, compute:
    - a 50-day EMA (`pandas` `ewm`, span 50, `adjust=False`)
    - a 14-period RSI from a simple rolling mean of gains and losses (not Wilder smoothing)
@@ -73,7 +73,7 @@ These are visible in the code and in the Actions history. They are descriptions 
 
 There is no screenshot in the repo. The block below is **an example of the layout**, produced by calling `WhatsAppBot.format_stock_report` with made-up prices, scores, and headlines. It was not captured from a phone, and it is not a record of a live run. The figures do follow the scoring rules: 100 is all four point awards, and 55 is EMA plus the RSI band only. Headlines are sliced to 100 characters (80 for a stock mention) and the code always appends `...`.
 
-On 1 September, 1 October, and 5 November 2026 the real message took the empty-screen path (`No strong breakouts detected today.`) because Yahoo Finance returned no prices. See [Limitations](#limitations).
+On 1 September, 1 October, and 5 November 2026 the real message took the empty-screen path (`No strong breakouts detected today.`) because `yfinance` 0.2.33 returned no prices. With `yfinance` 1.8.0 and a six-month window, the same screen returned 10 names on 25 November 2026. The block below is still a layout example, not that run.
 
 ```text
 🚀 *PRE-MARKET STOCK PULSE*
@@ -125,7 +125,7 @@ Checked against the GitHub Actions API on 25 November 2026. The full list is on 
 - The cron is 03:30 UTC, but the runs started later. Across all 328 runs the **median start was 166 minutes after 03:30 UTC**. The median delay was 60 minutes in January 2026, 381 minutes in October, and 481 minutes in November. A January run often began around 10:00 IST. By November, runs were often starting in the evening IST. The schedule says 09:00. The history does not.
 - Where a successful run's last-update time is still within 30 minutes of its start (234 runs), the gap from start to update was **62 to 126 seconds, median 80 seconds**, including dependency install. On 5 November the script step itself lasted about 30 seconds.
 - A green run was not, by itself, proof of delivery: until this branch, a failed Twilio send still exited 0. The logs opened for **1 September, 1 October, and 5 November 2026** each show Twilio accepting the message (HTTP 201). The other success logs were not opened. The 15 August 2026 log is no longer retained (HTTP 410).
-- Those same three logs show **zero names screened**. Yahoo Finance returned an error for all 50 symbols (`Expecting value: line 1 column 1`). Each run still fetched 40 headlines (5 tagged high-impact, 3 tagged macro, 0 stock mentions) and sent the empty-screen message.
+- Those same three logs show **zero names screened**. Yahoo Finance returned an error for all 50 symbols (`Expecting value: line 1 column 1`). Each run still fetched 40 headlines (5 tagged high-impact, 3 tagged macro, 0 stock mentions) and sent the empty-screen message. This branch pins `yfinance` 1.8.0 and asks for six months of bars. On 25 November 2026 that window was 126 rows for the names checked, and the screen returned 10 names.
 - The **6 November and 25 November 2026** logs both fail in `actions/setup-python` with: `The version '3.9' with architecture 'x64' was not found for Ubuntu 26.04.` The workflow file on `main` had not changed. Those logs also warn that `actions/checkout@v3` and `actions/setup-python@v4` target Node.js 20. This branch uses Python 3.12, `actions/checkout@v7`, and `actions/setup-python@v7`.
 
 As of 25 November 2026 the public repo had the description "Daily stock market alerts", no topics, 0 stars, 0 forks, and no issues or pull requests. GitHub does not render `readme.txt`, which is why this file is `README.md`.
@@ -133,7 +133,7 @@ As of 25 November 2026 the public repo had the description "Daily stock market a
 ## Tech stack
 
 - Python 3.12 in GitHub Actions. The pins in `requirements.txt` (including `numpy==1.26.2` and `pandas==2.1.4`) support 3.12 and not 3.13.
-- [yfinance](https://github.com/ranaroussi/yfinance) `0.2.33` for daily OHLCV
+- [yfinance](https://github.com/ranaroussi/yfinance) `1.8.0` for daily OHLCV (`curl_cffi` for Yahoo's current endpoint)
 - pandas and numpy for the EMA, RSI, and volume math
 - [NewsAPI](https://newsapi.org/) (`newsapi-python==0.2.7`) for headlines
 - [VADER](https://github.com/cjhutto/vaderSentiment) `3.3.2` for the sentiment score
@@ -141,7 +141,7 @@ As of 25 November 2026 the public repo had the description "Daily stock market a
 - `python-dotenv` for a local `.env` file
 - GitHub Actions for the schedule
 
-`requirements.txt` is already a fully pinned freeze, including transitive packages. This branch does not loosen it.
+`requirements.txt` is a fully pinned freeze, including transitive packages. `yfinance` is pinned at 1.8.0, which is what Yahoo's current endpoint accepts. The numpy and pandas pins are unchanged.
 
 ## Setup
 
@@ -193,8 +193,8 @@ Editing `DEFAULT_TICKERS` is how the universe changes. There is no CSV loader.
 
 ## Limitations
 
-- **Prices are not coming back with the pinned client.** On 25 November 2026, `yfinance==0.2.33` returned no rows for `RELIANCE.NS` and raised `Expecting value: line 1 column 1`, the same error as the September, October, and 5 November Actions logs. The screen in those logs was empty. Upgrading the library is a product fix, not a cosmetic one, and it is not in this branch.
-- **Three months of bars is shorter than the screen's minimum.** The same day, `yfinance` 1.8.0 (not the version this repo installs) returned **62** daily rows for a 3-month window on `RELIANCE.NS`, `TCS.NS`, and `ITC.NS`, and **126** rows for 6 months. The code drops a series shorter than **70** rows. A newer library, without a longer window, would still drop those names.
+- `yfinance` 0.2.33 no longer parses Yahoo's response, which is why the September–November 2026 logs screened zero names. The pin is now 1.8.0, and the download is six months so the 70-row check can pass. On 25 November 2026 a 3-month window was still only 62 rows, and six months was 126.
+- `TATAMOTORS.NS` had no Yahoo quote on that day (`Quote not found`), so that one symbol is skipped. The other 49 were fetched. The list in `config.py` is unchanged.
 - The message can say `PRE-MARKET` and `Stock Pulse AI` while the inputs are the previous daily bar and a lexicon.
 - News matching is a substring. `LT`, `ITC`, and `TCS` will hit unrelated headlines.
 - High-impact and macro lists are the first matches in fetch order, capped at 5 and 3. They are not sorted by score.
@@ -208,7 +208,7 @@ Editing `DEFAULT_TICKERS` is how the universe changes. There is no CSV loader.
 Not a commitment. Reasonable follow-ons from the limits above:
 
 - Revoke the NewsAPI key that remains in git history, and confirm a manual Actions run actually reaches the phone.
-- Move off `yfinance==0.2.33`, and request enough daily history that the 70-row check can pass (6 months was 126 rows on 25 November 2026).
+- Replace `TATAMOTORS.NS` if you still want that business in the universe. Yahoo has no quote for that symbol.
 - Skip weekends and NSE holidays.
 - Match tickers on word boundaries, and change the message footer and title so they match the data.
 - Add a redacted screenshot of a real message.
