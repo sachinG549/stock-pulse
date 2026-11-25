@@ -4,13 +4,12 @@ Core analysis engine for technical screening and sentiment analysis
 import yfinance as yf
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import timedelta
 from newsapi import NewsApiClient
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import config
 import logging
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -34,8 +33,12 @@ class TechnicalAnalyzer:
         rsi = 100 - (100 / (1 + rs))
         return rsi
     
-    def fetch_stock_data(self, ticker, period='3mo'):
-        """Fetch historical data for a single ticker"""
+    def fetch_stock_data(self, ticker, period='6mo'):
+        """Fetch daily bars for one ticker.
+
+        Six months clears the 70-row minimum (50-day EMA plus a buffer).
+        Three months is often only about 60 NSE sessions.
+        """
         try:
             stock = yf.Ticker(ticker)
             hist = stock.history(period=period)
@@ -143,7 +146,7 @@ class NewsAnalyzer:
     def fetch_market_news(self):
         """Fetch general market and macro news"""
         try:
-            from_date = (datetime.now() - timedelta(days=config.NEWS_LOOKBACK_DAYS)).strftime('%Y-%m-%d')
+            from_date = (config.now_ist() - timedelta(days=config.NEWS_LOOKBACK_DAYS)).strftime('%Y-%m-%d')
             
             # Fetch India-specific business news
             india_news = self.newsapi.get_everything(
@@ -179,7 +182,7 @@ class NewsAnalyzer:
     def fetch_stock_specific_news(self, stock_names):
         """Fetch news for specific stocks"""
         try:
-            from_date = (datetime.now() - timedelta(days=config.NEWS_LOOKBACK_DAYS)).strftime('%Y-%m-%d')
+            from_date = (config.now_ist() - timedelta(days=config.NEWS_LOOKBACK_DAYS)).strftime('%Y-%m-%d')
             
             # Create query for top stocks
             query = ' OR '.join(stock_names[:5])  # Limit to top 5 to avoid query length issues

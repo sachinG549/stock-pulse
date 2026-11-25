@@ -3,19 +3,26 @@ Configuration file for Pre-Market Stock Pulse
 All sensitive data is loaded from environment variables
 """
 import os
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from dotenv import load_dotenv
 
 # Load environment variables from .env file (for local development)
 load_dotenv()
 
-# Print for debugging (remove in production)
-print(f"Config loaded. NewsAPI Key present: {bool('8046be0a1df8479bbbbbebc6ae773ddb')}")
+IST = ZoneInfo("Asia/Kolkata")
+
+def now_ist():
+    """Current time in Asia/Kolkata. Runners report UTC from datetime.now()."""
+    return datetime.now(IST)
 
 # API Configuration
 NEWSAPI_KEY = os.environ.get('NEWSAPI_KEY')
 TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID')
 TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN')
-TWILIO_WHATSAPP_FROM = os.environ.get('TWILIO_WHATSAPP_FROM', 'whatsapp:+14155238886')
+# Empty string should keep the public Twilio sandbox sender.
+TWILIO_WHATSAPP_FROM = os.environ.get('TWILIO_WHATSAPP_FROM') or 'whatsapp:+14155238886'
 TARGET_PHONE_NUMBER = os.environ.get('TARGET_PHONE_NUMBER')  # Format: whatsapp:+919876543210
 
 # Market Configuration

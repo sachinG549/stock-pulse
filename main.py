@@ -5,19 +5,30 @@ Run this script daily at 9:00 AM IST via scheduler
 import sys
 import logging
 from datetime import datetime
+from zoneinfo import ZoneInfo
+
+class ISTFormatter(logging.Formatter):
+    """Stamp log lines in Asia/Kolkata. GitHub runners are UTC."""
+
+    def formatTime(self, record, datefmt=None):
+        dt = datetime.fromtimestamp(record.created, ZoneInfo("Asia/Kolkata"))
+        return dt.strftime(datefmt or "%Y-%m-%d %H:%M:%S")
+
+_formatter = ISTFormatter("%(asctime)s IST - %(name)s - %(levelname)s - %(message)s")
+_handlers = [
+    logging.FileHandler("stock_pulse.log"),
+    logging.StreamHandler(sys.stdout),
+]
+for _handler in _handlers:
+    _handler.setFormatter(_formatter)
+# Configure logging before the local imports. analyzer and whatsapp_bot
+# must not call logging.basicConfig(), or this file handler never attaches.
+logging.basicConfig(level=logging.INFO, handlers=_handlers)
+
 import config
 from analyzer import TechnicalAnalyzer, NewsAnalyzer
 from whatsapp_bot import WhatsAppBot
 
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('stock_pulse.log'),
-        logging.StreamHandler(sys.stdout)
-    ]
-)
 logger = logging.getLogger(__name__)
 
 
@@ -29,7 +40,7 @@ def run_analysis():
     try:
         logger.info("=" * 60)
         logger.info("STARTING PRE-MARKET STOCK PULSE ANALYSIS")
-        logger.info(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S IST')}")
+        logger.info(f"Timestamp: {config.now_ist().strftime('%Y-%m-%d %H:%M:%S IST')}")
         logger.info("=" * 60)
         
         # Step 1: Technical Analysis
@@ -123,7 +134,7 @@ def send_daily_report():
         try:
             bot = WhatsAppBot()
             bot.send_error_notification(error_msg)
-        except:
+        except Exception:
             logger.error("Failed to send error notification")
         
         logger.info("=" * 60)
@@ -201,9 +212,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     if args.test:
-        test_setup()
-    elif args.run:
-        send_daily_report()
+        ok = test_setup()
     else:
-        # Default: run daily report
-        send_daily_report()
+        # --run and the default both send the daily report
+        ok = send_daily_report()
+    sys.exit(0 if ok else 1)

@@ -2,32 +2,34 @@ name: Daily Stock Pulse Report
 
 on:
   schedule:
-    # Runs at 9:00 AM IST (3:30 AM UTC)
+    # 03:30 UTC is 09:00 IST year-round. GitHub may start the job later.
     - cron: '30 3 * * *'
-  workflow_dispatch:  # Allows manual trigger
+  workflow_dispatch:
 
 jobs:
   send-report:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
-    
+      uses: actions/checkout@v7
+
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v7
       with:
-        python-version: '3.9'
-    
+        # 3.9 is not published for Ubuntu 26.04, which is why scheduled
+        # runs failed from 6 Nov 2026. 3.12 is published for that image.
+        # numpy 1.26 and pandas 2.1 in requirements.txt do not support 3.13.
+        python-version: '3.12'
+
     - name: Install dependencies
-      run: |
-        pip install -r requirements.txt
-    
+      run: pip install -r requirements.txt
+
     - name: Run Stock Pulse
       env:
         NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
         TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
         TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+        TWILIO_WHATSAPP_FROM: ${{ secrets.TWILIO_WHATSAPP_FROM }}
         TARGET_PHONE_NUMBER: ${{ secrets.TARGET_PHONE_NUMBER }}
-      run: |
-        python main.py --run
+      run: python main.py --run
